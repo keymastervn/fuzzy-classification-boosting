@@ -1,21 +1,69 @@
-require 'gmail'
-require 'yaml'
-require 'base64'
-require './helper.rb'
-require 'model/mail.rb'
+require 'pp'
+require './helper'
+require './model/human'
+require './model/fuzzy_attribute'
+require './model/output'
+require './fuzzy_rule/height'
+require './fuzzy_rule/weight'
+require './model/fuzzy_classifier'
+require './model/learner'
 
-full_set = []
-identity = YAML.load_file(".identity")
-Gmail.connect(Base64.decode64(identity['account']), Base64.decode64(identity['password'])) do |gmail|
-  inbox = gmail.inbox.find(:all)
-  inbox.each {|email|
-    full_set << Mail.new(
-      email.uid,
-      email.from,
-      email.subject,
-      Helper.html2text(email.body.raw_source)
-    )
+FULL_SET = []
+
+File.open('training_patterns').each_line {|line|
+  line.chomp!
+  FULL_SET << Human.new(
+      line.split("\t")[0],
+      line.split("\t")[1].to_i,
+      line.split("\t")[2].to_i,
+      line.split("\t")[3]
+    ).get_fuzzy_info
+}
+
+def boosting()
+
+  boost_set = {}
+
+  # Create minimal itemset for each item
+  FULL_SET.each {|item|
+    boost_set[item] = Learner.new(item).action
   }
+
+  # removed terminated learner
+  boost_set.reject! {|k,learner|
+    learner.terminated?
+  }
+
+  round = 0
+  while boost_set.length > 0
+
+    # low dp will be placed at first
+    ramp = boost_set.sort_by {|k,learner| learner.get_dp}
+
+    # lowest weak learner will be joined to the other weak learner
+    item = ramp.first.first
+    item_learner = ramp.first.last
+
+    puts "Weak learner: #{item_learner.itemset.collect(&:name)}"
+
+    boost_set.delete(item)
+
+    boost_set.each {|k,learner|
+      learner.add_another_weak_learner(item)
+    }
+
+    boost_set.each {|k,learner|
+      learner.action
+    }
+
+    # removed terminated learner
+    boost_set.reject! {|k,learner|
+      learner.terminated?
+    }
+
+    round += 1
+    puts "-----------8<---------- round: #{round} input_left: #{boost_set.length}"
+  end
 end
 
-
+boosting
