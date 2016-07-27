@@ -21,7 +21,7 @@ File.open('training_patterns').each_line {|line|
 }
 
 def boosting()
-
+  weak_learner = []
   boost_set = {}
 
   # Create minimal itemset for each item
@@ -37,6 +37,11 @@ def boosting()
   round = 0
   while boost_set.length > 0
 
+    boost_set.each {|item,v|
+      weak_learner << item.name
+    }
+    puts "Weak learner: #{weak_learner.join(" ")}"
+
     # low dp will be placed at first
     ramp = boost_set.sort_by {|k,learner| learner.get_dp}
 
@@ -44,7 +49,7 @@ def boosting()
     item = ramp.first.first
     item_learner = ramp.first.last
 
-    puts "Weak learner: #{item_learner.itemset.collect(&:name)}"
+    puts "Weakest learner to be combined: #{item_learner.itemset.collect(&:name)}"
 
     boost_set.delete(item)
 
@@ -62,6 +67,7 @@ def boosting()
     }
 
     round += 1
+    weak_learner = []
     puts "-----------8<---------- round: #{round} input_left: #{boost_set.length}"
   end
 end
